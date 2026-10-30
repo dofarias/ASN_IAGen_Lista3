@@ -133,7 +133,7 @@ adequada e mostrando o comando e a saída.
 ## Observações
 
 - Os CSVs originais em `Garden Shop/` são preservados; a skill nunca os sobrescreve.
-- Saídas geradas (CSVs e gráficos) vão para `output/`, que não é versionada
-  (ver `.gitignore`).
+- Saídas geradas (CSVs e gráficos) vão para `output/`, versionada no repositório
+  como exemplos de resultado.
 - As contagens de exemplo foram conferidas manualmente (ex.: total de pedidos
   `shipped` = 17 na base atual).
