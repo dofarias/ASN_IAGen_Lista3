@@ -182,12 +182,128 @@ def q_avg_order_value(data, state=None, start=None, end=None) -> pd.DataFrame:
     )
 
 
+def q_orders_by_status(data, state=None, start=None, end=None) -> pd.DataFrame:
+    """Quantidade de pedidos por situação (status), considerando todos os status.
+
+    Diferente das demais análises, NÃO filtra por 'entregue'. O filtro de período,
+    quando usado, é aplicado a order_date (data em que o pedido foi realizado),
+    pois a pergunta abrange todos os status, inclusive os que não têm shipped_date.
+    """
+    orders = _apply_period_filter(data["orders"].copy(), "order_date", start, end)
+    orders = _apply_state_filter(orders, data["customers"], state)
+    if orders.empty:
+        return pd.DataFrame(columns=["status", "orders"])
+    out = (
+        orders.groupby("status", as_index=False)["order_id"].nunique()
+        .rename(columns={"order_id": "orders"})
+        .sort_values(["orders", "status"], ascending=[False, True])
+        .reset_index(drop=True)
+    )
+    return out
+
+
+def q_avg_order_value_by_month(data, state=None, start=None, end=None) -> pd.DataFrame:
+    """Ticket médio por pedido entregue, mês a mês (por shipped_date).
+
+    Para cada pedido entregue, valor = soma de (quantity*unit_price); o pedido é
+    atribuído ao mês de shipped_date; o ticket médio do mês é a média dos valores
+    dos pedidos daquele mês.
+    """
+    delivered = delivered_orders(data, state, start, end)
+    if delivered.empty:
+        return pd.DataFrame(columns=["month", "delivered_orders", "total_value", "avg_order_value"])
+    delivered = delivered.dropna(subset=["shipped_date"]).copy()
+    delivered["month"] = delivered["shipped_date"].dt.strftime("%Y-%m")
+
+    items = data["order_items"].copy()
+    items["line_value"] = items["quantity"] * items["unit_price"]
+    per_order = (
+        items[items["order_id"].isin(delivered["order_id"])]
+        .groupby("order_id", as_index=False)["line_value"].sum()
+        .rename(columns={"line_value": "order_value"})
+    )
+    # Associa cada pedido ao seu mês de envio.
+    per_order = per_order.merge(
+        delivered[["order_id", "month"]], on="order_id", how="left"
+    )
+    out = (
+        per_order.groupby("month", as_index=False)
+        .agg(delivered_orders=("order_id", "nunique"),
+             total_value=("order_value", "sum"),
+             avg_order_value=("order_value", "mean"))
+        .sort_values("month")
+        .reset_index(drop=True)
+    )
+    out["total_value"] = out["total_value"].round(2)
+    out["avg_order_value"] = out["avg_order_value"].round(2)
+    return out
+
+
 QUESTIONS = {
     "delivered-by-month": q_delivered_by_month,
     "delivered-by-month-state": q_delivered_by_month_state,
     "top-states": q_top_states,
     "avg-order-value": q_avg_order_value,
+    "avg-order-value-by-month": q_avg_order_value_by_month,
+    "orders-by-status": q_orders_by_status,
 }
+
+
+def make_chart(result: pd.DataFrame, question: str, out_path: Path, title: str | None = None) -> Path:
+    """Gera um gráfico a partir do resultado de uma pergunta.
+
+    - delivered-by-month: barras por mês.
+    - top-states: barras por UF.
+    - delivered-by-month-state: barras agrupadas (mês no eixo X, uma barra por UF).
+    - avg-order-value-by-month: linha de tendência do ticket médio por mês.
+    avg-order-value não é adequado a gráfico (valor único); nesse caso, levanta erro.
+    """
+    import matplotlib
+    matplotlib.use("Agg")  # backend sem janela, salva em arquivo
+    import matplotlib.pyplot as plt
+
+    if result.empty:
+        raise ValueError("Resultado vazio: não há dados para plotar.")
+
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(figsize=(9, 5))
+
+    if question == "delivered-by-month":
+        ax.bar(result["month"], result["delivered_orders"], color="#4c9a2a")
+        ax.set_xlabel("Mês")
+        ax.set_ylabel("Pedidos entregues")
+    elif question == "top-states":
+        ax.bar(result["state"], result["delivered_orders"], color="#4c9a2a")
+        ax.set_xlabel("UF")
+        ax.set_ylabel("Pedidos entregues")
+    elif question == "delivered-by-month-state":
+        pivot = result.pivot_table(
+            index="month", columns="state", values="delivered_orders",
+            aggfunc="sum", fill_value=0,
+        )
+        pivot.plot(kind="bar", ax=ax)
+        ax.set_xlabel("Mês")
+        ax.set_ylabel("Pedidos entregues")
+        ax.legend(title="UF")
+        plt.xticks(rotation=0)
+    elif question == "avg-order-value-by-month":
+        ax.plot(result["month"], result["avg_order_value"],
+                marker="o", color="#4c9a2a")
+        for x, y in zip(result["month"], result["avg_order_value"]):
+            ax.annotate(f"{y:.2f}", (x, y), textcoords="offset points",
+                        xytext=(0, 8), ha="center", fontsize=8)
+        ax.set_xlabel("Mês")
+        ax.set_ylabel("Ticket médio (USD)")
+        ax.set_ylim(bottom=0)
+    else:
+        raise ValueError(f"Pergunta '{question}' não tem gráfico padrão definido.")
+
+    ax.set_title(title or question)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=120)
+    plt.close(fig)
+    return out_path
 
 
 def main(argv=None) -> int:
@@ -199,6 +315,9 @@ def main(argv=None) -> int:
     parser.add_argument("--end", default=None, help="Data final AAAA-MM-DD")
     parser.add_argument("--top-n", type=int, default=5)
     parser.add_argument("--out-dir", default=None, help="Pasta para salvar o CSV do resultado")
+    parser.add_argument("--chart", action="store_true", help="Gera um gráfico do resultado")
+    parser.add_argument("--chart-out", default=None, help="Caminho do PNG (padrão: output/<pergunta>.png)")
+    parser.add_argument("--title", default=None, help="Título do gráfico")
     args = parser.parse_args(argv)
 
     data = load_data(args.data_dir)
@@ -218,6 +337,11 @@ def main(argv=None) -> int:
         out_path = out_dir / f"{args.question}.csv"
         result.to_csv(out_path, index=False)
         print(f"\nResultado salvo em: {out_path}")
+
+    if args.chart:
+        chart_out = Path(args.chart_out) if args.chart_out else Path("output") / f"{args.question}.png"
+        saved = make_chart(result, args.question, chart_out, title=args.title)
+        print(f"Gráfico salvo em: {saved}")
     return 0
 
 

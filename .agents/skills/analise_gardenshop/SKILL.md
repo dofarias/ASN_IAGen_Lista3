@@ -13,7 +13,8 @@ Python+pandas e devolvendo uma resposta verificável (tabela + código + saída 
 - **Objetivo:** apoiar o estudo de dados da loja, transformando perguntas em
   análises executadas sem reescrever código do zero a cada pedido.
 - **Incluído:** pedidos entregues por mês, pedidos entregues por mês e UF, top UFs
-  por pedidos entregues, ticket médio por pedido entregue; filtros por UF e por período.
+  por pedidos entregues, ticket médio por pedido entregue, ticket médio por mês,
+  pedidos por situação (`status`); filtros por UF e por período; gráficos opcionais.
 - **Fora do escopo:** previsões/modelagem, dados fora dos 6 CSVs, edição dos CSVs
   originais.
 
@@ -65,6 +66,11 @@ Pontos que mudam o cálculo:
    itens no nível de item antes de agregar por pedido.
 6. **Datas** nos CSVs são `AAAA-MM-DD` (o dicionário diz DD/MM/AAAA — ignore o
    dicionário neste ponto). Formato inesperado interrompe a execução.
+7. **Contagem por situação (`status`):** perguntas sobre "pedidos por situação"
+   consideram **todos os status** (`shipped`, `pending`, `processing`, `cancelled`),
+   sem o filtro de "entregue". Nesse caso, o filtro de período (se usado) recai
+   sobre `order_date`, não `shipped_date`. A saída lista apenas os status
+   presentes; um status com zero pedidos não aparece na tabela.
 
 ## 6. Procedimento
 
@@ -154,6 +160,13 @@ da coluna é igual ao total de pedidos `shipped` (17 na base atual, sem filtros)
 **Resultado esperado:** tabela com `month`, `state` e `delivered_orders`
 (`delivered-by-month-state` com `--start 2024-01-01 --end 2024-03-31`); os totais
 por mês coincidem com os de `delivered-by-month` no mesmo período.
+
+### Pedido que abrange todos os status
+> "Qual a quantidade de pedidos da UF = PA por situação?"
+
+**Resultado esperado:** tabela com `status` e `orders` (`orders-by-status --state PA`),
+considerando todos os status (não só `shipped`); status com zero pedidos não
+aparecem na tabela.
 
 ### Entrada ausente ou inválida
 > "Ticket médio por pedido entregue na UF ZZ."
