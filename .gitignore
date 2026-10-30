@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Saídas geradas pela skill
+output/
+
+# SO / editor
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Arquivos temporários de leitura
+_tmp_*.py
