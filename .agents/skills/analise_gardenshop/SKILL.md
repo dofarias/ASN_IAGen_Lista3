@@ -12,8 +12,8 @@ Python+pandas e devolvendo uma resposta verificável (tabela + código + saída 
 
 - **Objetivo:** apoiar o estudo de dados da loja, transformando perguntas em
   análises executadas sem reescrever código do zero a cada pedido.
-- **Incluído:** pedidos entregues por mês, top UFs por pedidos entregues, ticket
-  médio por pedido entregue; filtros por UF e por período.
+- **Incluído:** pedidos entregues por mês, pedidos entregues por mês e UF, top UFs
+  por pedidos entregues, ticket médio por pedido entregue; filtros por UF e por período.
 - **Fora do escopo:** previsões/modelagem, dados fora dos 6 CSVs, edição dos CSVs
   originais.
 
@@ -76,9 +76,10 @@ Pontos que mudam o cálculo:
    `shipped_date`?). Aplique a regra da §5 e informe qual foi usada.
 
 ### Executar a tarefa
-4. Use `scripts/analyze.py` para as três perguntas padrão; para variações novas,
-   importe as funções do script (`delivered_orders`, `q_*`) ou escreva código
-   curto reaproveitando as mesmas regras.
+4. Use `scripts/analyze.py` para as perguntas padrão (`delivered-by-month`,
+   `delivered-by-month-state`, `top-states`, `avg-order-value`); para variações
+   novas, importe as funções do script (`delivered_orders`, `q_*`) ou escreva
+   código curto reaproveitando as mesmas regras.
 5. Execute no ambiente autorizado (ver §8) e capture a saída real.
 
 ### Conferir o resultado
@@ -97,8 +98,9 @@ Pontos que mudam o cálculo:
 
 - **Referências:** [references/data_dictionary.md](references/data_dictionary.md) — campos, relacionamentos e inconsistências;
   [references/business_rules.md](references/business_rules.md) — definições dos cálculos.
-- **Scripts:** [scripts/analyze.py](scripts/analyze.py) — carregamento, filtros e as três análises; executar
-  conforme §8.
+- **Scripts:** [scripts/analyze.py](scripts/analyze.py) — carregamento, filtros e as análises
+  (`delivered-by-month`, `delivered-by-month-state`, `top-states`, `avg-order-value`);
+  executar conforme §8.
 
 Resolva os caminhos de `references/` e `scripts/` a partir da pasta da skill. A
 pasta de dados e a pasta de saída são informadas pelo usuário (caminhos absolutos
@@ -111,6 +113,7 @@ ou relativos ao diretório atual), não presuma a máquina do autor.
 - **Execução (exemplos):**
   ```
   python scripts/analyze.py --data-dir "<pasta>" --question delivered-by-month
+  python scripts/analyze.py --data-dir "<pasta>" --question delivered-by-month-state --start 2024-01-01 --end 2024-03-31
   python scripts/analyze.py --data-dir "<pasta>" --question top-states --top-n 5
   python scripts/analyze.py --data-dir "<pasta>" --question avg-order-value --state PA --start 2024-01-01 --end 2024-06-30
   ```
@@ -144,6 +147,13 @@ mostre sempre o comando e a saída real.
 
 **Resultado esperado:** tabela com `month` (AAAA-MM) e `delivered_orders`; a soma
 da coluna é igual ao total de pedidos `shipped` (17 na base atual, sem filtros).
+
+### Pedido com duas dimensões e filtro
+> "Pedidos entregues no 1º trimestre por mês e UF."
+
+**Resultado esperado:** tabela com `month`, `state` e `delivered_orders`
+(`delivered-by-month-state` com `--start 2024-01-01 --end 2024-03-31`); os totais
+por mês coincidem com os de `delivered-by-month` no mesmo período.
 
 ### Entrada ausente ou inválida
 > "Ticket médio por pedido entregue na UF ZZ."

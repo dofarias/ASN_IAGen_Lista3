@@ -136,6 +136,25 @@ def q_top_states(data, top_n=5, start=None, end=None) -> pd.DataFrame:
     return out
 
 
+def q_delivered_by_month_state(data, state=None, start=None, end=None) -> pd.DataFrame:
+    """Pedidos entregues detalhados por mês (shipped_date) e UF do cliente."""
+    delivered = delivered_orders(data, state, start, end)
+    if delivered.empty:
+        return pd.DataFrame(columns=["month", "state", "delivered_orders"])
+    delivered = delivered.dropna(subset=["shipped_date"])
+    merged = delivered.merge(
+        data["customers"][["customer_id", "state"]], on="customer_id", how="left"
+    )
+    out = (
+        merged.assign(month=merged["shipped_date"].dt.strftime("%Y-%m"))
+        .groupby(["month", "state"], as_index=False)["order_id"].nunique()
+        .rename(columns={"order_id": "delivered_orders"})
+        .sort_values(["month", "delivered_orders", "state"], ascending=[True, False, True])
+        .reset_index(drop=True)
+    )
+    return out
+
+
 def q_avg_order_value(data, state=None, start=None, end=None) -> pd.DataFrame:
     """Ticket médio por pedido entregue: soma de (quantity*unit_price) por pedido, depois a média."""
     delivered = delivered_orders(data, state, start, end)
@@ -165,6 +184,7 @@ def q_avg_order_value(data, state=None, start=None, end=None) -> pd.DataFrame:
 
 QUESTIONS = {
     "delivered-by-month": q_delivered_by_month,
+    "delivered-by-month-state": q_delivered_by_month_state,
     "top-states": q_top_states,
     "avg-order-value": q_avg_order_value,
 }
